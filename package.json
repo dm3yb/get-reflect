@@ -4,6 +4,7 @@
 	"description": "GetReflect — automatic, scheduled backups of your 1Password vaults to JSON and CSV on your own Mac",
 	"private": true,
 	"type": "module",
+	"packageManager": "pnpm@10.33.0",
 	"engines": {
 		"node": ">=20.12"
 	},
