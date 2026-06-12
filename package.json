@@ -1,0 +1,62 @@
+{
+	"name": "get-reflect",
+	"version": "1.0.0",
+	"description": "GetReflect — automatic, scheduled backups of your 1Password vaults to JSON and CSV on your own Mac",
+	"private": true,
+	"type": "module",
+	"engines": {
+		"node": ">=20.12"
+	},
+	"scripts": {
+		"setup": "tsx src/setup.ts",
+		"backup": "tsx --env-file=.env src/index.ts",
+		"status": "tsx src/status.ts",
+		"uninstall": "tsx src/uninstall.ts",
+		"test": "vitest run",
+		"typecheck": "tsc --noEmit",
+		"lint": "oxlint src tests",
+		"format": "oxfmt src tests",
+		"format:check": "oxfmt --check src tests",
+		"prepare": "husky"
+	},
+	"keywords": [
+		"1password",
+		"backup",
+		"macos",
+		"launchd",
+		"cli",
+		"vault",
+		"export"
+	],
+	"author": "Dmytro Bobryshev",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/dm3yb/get-reflect.git"
+	},
+	"homepage": "https://github.com/dm3yb/get-reflect#readme",
+	"bugs": {
+		"url": "https://github.com/dm3yb/get-reflect/issues"
+	},
+	"devDependencies": {
+		"@types/node": "25.5.0",
+		"@types/papaparse": "5.5.2",
+		"@types/plist": "3.0.5",
+		"husky": "9.1.7",
+		"oxfmt": "0.40.0",
+		"oxlint": "1.55.0",
+		"tsx": "4.21.0",
+		"typescript": "5.9.3",
+		"vitest": "4.1.0"
+	},
+	"dependencies": {
+		"@clack/prompts": "^1.5.1",
+		"chalk": "5.6.2",
+		"date-fns": "4.1.0",
+		"p-limit": "7.3.0",
+		"papaparse": "5.5.3",
+		"path-exists": "^5.0.0",
+		"plist": "5.0.0",
+		"untildify": "^6.0.0"
+	}
+}
