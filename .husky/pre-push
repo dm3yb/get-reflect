@@ -1,0 +1,50 @@
+GREEN="\033[32m"
+RED="\033[31m"
+GRAY="\033[90m"
+BOLD="\033[1m"
+RESET="\033[0m"
+
+CONNECTOR="${GRAY}│${RESET}"
+GREEN_CIRCLE="${GREEN}●${RESET}"
+RED_CIRCLE="${RED}●${RESET}"
+
+indent_output() {
+  while IFS= read -r line; do
+    printf "${CONNECTOR}  ${GRAY}%s${RESET}\n" "$line"
+  done
+}
+
+run_step() {
+  label="$1"
+  shift
+  output=$("$@" 2>&1)
+  status=$?
+  if [ $status -eq 0 ]; then
+    printf "${GREEN_CIRCLE}  %s\n" "$label"
+  else
+    printf "${RED_CIRCLE}  ${RED}%s${RESET}\n" "$label"
+  fi
+  printf "%s\n" "$output" | indent_output
+  printf "${CONNECTOR}\n"
+  return $status
+}
+
+printf "${GRAY}┌${RESET}  ${BOLD}🚀 Pre-push checks${RESET}\n"
+printf "${CONNECTOR}\n"
+
+if ! run_step "Formatting" pnpm run format:check; then
+  printf "${GRAY}└${RESET}  ${RED}✖ Push aborted${RESET}\n"
+  exit 1
+fi
+
+if ! run_step "Linting" pnpm run lint; then
+  printf "${GRAY}└${RESET}  ${RED}✖ Push aborted${RESET}\n"
+  exit 1
+fi
+
+if ! run_step "Tests" pnpm run test; then
+  printf "${GRAY}└${RESET}  ${RED}✖ Push aborted${RESET}\n"
+  exit 1
+fi
+
+printf "${GRAY}└${RESET}  ${GREEN}✔ All checks passed${RESET}\n"
