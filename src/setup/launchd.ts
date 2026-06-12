@@ -23,10 +23,8 @@ export function scheduleToCalendarInterval(schedule: Schedule): CalendarInterval
 
 export type PlistOptions = {
   label: string;
-  nodePath: string;
+  programArguments: string[];
   workingDir: string;
-  scriptPath: string;
-  envFile: string;
   calendarInterval: CalendarInterval;
   logPath: string;
   pathEnv: string;
@@ -36,14 +34,7 @@ export type PlistOptions = {
 export function buildPlist(opts: PlistOptions): string {
   return buildPlistXml({
     Label: opts.label,
-    ProgramArguments: [
-      opts.nodePath,
-      "--import",
-      "tsx/esm",
-      `--env-file=${opts.envFile}`,
-      opts.scriptPath,
-      "--scheduled",
-    ],
+    ProgramArguments: opts.programArguments,
     WorkingDirectory: opts.workingDir,
     EnvironmentVariables: { PATH: opts.pathEnv },
     StartCalendarInterval: opts.calendarInterval,
