@@ -19,10 +19,13 @@ const mockedExecFileAsync = vi.mocked(execFileAsync);
 
 const PLIST_OPTS = {
   label: "com.user.get-reflect",
-  nodePath: "/opt/homebrew/bin/node",
-  workingDir: "/Users/test/Developer/get-reflect",
-  scriptPath: "/Users/test/Developer/get-reflect/src/index.ts",
-  envFile: ".env",
+  programArguments: [
+    "/opt/homebrew/bin/node",
+    "/opt/homebrew/lib/node_modules/get-reflect/dist/cli.js",
+    "backup",
+    "--scheduled",
+  ],
+  workingDir: "/Users/test",
   calendarInterval: { Weekday: 1, Hour: 2, Minute: 0 },
   logPath: "/Users/test/Library/Logs/get-reflect.log",
   pathEnv: "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
@@ -38,15 +41,8 @@ describe("buildPlist", () => {
     const parsed = parsePlist(buildPlist(PLIST_OPTS)) as Record<string, unknown>;
 
     expect(parsed.Label).toBe("com.user.get-reflect");
-    expect(parsed.WorkingDirectory).toBe("/Users/test/Developer/get-reflect");
-    expect(parsed.ProgramArguments).toEqual([
-      "/opt/homebrew/bin/node",
-      "--import",
-      "tsx/esm",
-      "--env-file=.env",
-      "/Users/test/Developer/get-reflect/src/index.ts",
-      "--scheduled",
-    ]);
+    expect(parsed.WorkingDirectory).toBe("/Users/test");
+    expect(parsed.ProgramArguments).toEqual(PLIST_OPTS.programArguments);
     expect(parsed.EnvironmentVariables).toEqual({
       PATH: "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
     });
