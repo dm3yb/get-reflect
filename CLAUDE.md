@@ -25,11 +25,11 @@ The Husky pre-push hook runs `format:check`, `lint`, and `test`; run all three (
 
 ## Architecture
 
-Entry points (one file per command, no build step — launchd invokes `node --import tsx/esm` on the TypeScript sources directly):
+**One CLI entry** — `src/cli.ts` (the npm `bin`, shebang preserved by tsc) routes subcommands and loads `~/.config/get-reflect/config.env` into the environment via `loadConfigFile()` before dispatch. `setup` is the default command, so `npx get-reflect` is the full onboarding. Dev runs use tsx on the sources (`pnpm run <cmd>` → `tsx src/cli.ts <cmd>`); npm ships the compiled `dist/` (`pnpm run build`, `tsc -p tsconfig.build.json`).
 
-1. **Backup** — `src/index.ts` → `src/backup.ts` (`main`) → `src/services/op-cli.ts` (wrappers around the `op` CLI; `execFile` only, never a shell) → writes `backup.json` plus a TSV `backup.csv` (`src/utils/csv.ts`, papaparse) into `<backup root>/<YYYY-MM-DD>/<vault-slug>/`. The backup root comes from `src/config.ts` (`BACKUP_PATH` or the iCloud Drive default). Item fetches share one global `p-limit(3)`.
-2. **Setup wizard** — `src/setup.ts` orchestrates `src/setup/preflight.ts` (macOS guard; offers `brew install 1password-cli` when `op` is missing) → `src/setup/prompts.ts` (clack prompts; the token is **live-verified** via `op vault list` before being accepted) → `src/setup/env-file.ts` (writes `.env`, mode 0600) → `src/setup/launchd.ts` (renders the plist into `launchd/`, copies it to `~/Library/LaunchAgents`, reloads via `launchctl`) → optional first backup (calls backup `main()` directly).
-3. **Status / Uninstall** — `src/status.ts` (read-only report; loads `.env` via `process.loadEnvFile` if present) and `src/uninstall.ts` (unload + remove the agent). Shared names live in `src/constants.ts` (`LAUNCHD_LABEL`, plist/log paths).
+1. **Backup** — `src/backup.ts` (`main`) → `src/services/op-cli.ts` (wrappers around the `op` CLI; `execFile` only, never a shell) → writes `backup.json` plus a TSV `backup.csv` (`src/utils/csv.ts`, papaparse) into `<backup root>/<YYYY-MM-DD>/<vault-slug>/`. The backup root comes from `src/config.ts` (`BACKUP_PATH` or the iCloud Drive default). Item fetches share one global `p-limit(3)`.
+2. **Setup wizard** — `src/setup.ts` (`runSetup`) orchestrates `src/setup/preflight.ts` (macOS guard; offers `brew install 1password-cli` when `op` is missing) → `src/setup/prompts.ts` (clack prompts; the token is **live-verified** via `op vault list` before being accepted) → `src/setup/env-file.ts` (writes the config file, mode 0600, dir 0700) → `src/setup/launchd.ts` (renders the plist into the config dir, copies it to `~/Library/LaunchAgents`, reloads via `launchctl`) → optional first backup (calls backup `main()` directly). The agent's `ProgramArguments` re-invoke the *currently running entry*: `dist/cli.js` when installed, the sources via `--import tsx/esm` in dev (`agentProgramArguments` in setup.ts).
+3. **Status / Uninstall** — `src/status.ts` (`runStatus`, read-only report) and `src/uninstall.ts` (`runUninstall`, unload + remove the agent). Shared names live in `src/constants.ts` (`LAUNCHD_LABEL`, `VERSION` — kept in sync with package.json, plist/log paths).
 
 ### The interval-gating design (spans several files — read before touching scheduling)
 
@@ -43,9 +43,9 @@ launchd's `StartCalendarInterval` cannot express "every N weeks". The workaround
 
 `src/utils/logger.ts` is a thin adapter over `@clack/prompts` (intro/outro/log/spinner). It contains a deliberate `staticSpinner` fallback for non-TTY output: clack animates spinner frames even without a TTY (only `CI=true` is special-cased), which would fill the launchd log with escape codes. Keep that fallback.
 
-### `launchd/` (gitignored)
+### Generated plist
 
-The generated plist is machine-specific (absolute node path, repo path, schedule) and produced by `pnpm run setup` — change the generator in `src/setup/launchd.ts`, never a plist by hand.
+The plist is machine-specific (absolute node/entry paths, schedule), generated into `~/.config/get-reflect/` by setup and installed into `~/Library/LaunchAgents` — change the generator in `src/setup/launchd.ts`, never a plist by hand.
 
 ## Testing conventions
 
@@ -62,9 +62,9 @@ The generated plist is machine-specific (absolute node path, repo path, schedule
 - **Prefer popular packages over hand-rolled utilities.** Precedents: `@clack/prompts` (prompts + spinners + timeline), `untildify` (`~` expansion), `path-exists`, `p-limit`, `date-fns` (all date parsing/math — no manual `Date` arithmetic), papaparse (TSV), plist (XML escaping).
 - **No shell execution.** All subprocess calls go through `execFileAsync` (`src/utils/exec.ts`) with argument arrays — `op` handles secrets.
 - **Comments are block-format only** — `/** … */` JSDoc on declarations, `/* … */` inside bodies; no `//` lines. Write one only for rationale, caveats, or workarounds the code can't express — never to restate the code. Each module starts with a short `/* … */` purpose header (keep non-obvious rationale notes, e.g. the launchd limitation).
-- `.env` holds the 1Password service-account token (written 0600, gitignored). Never log token values; `op` output may contain secrets too — backup files must only be written under the backup root, mode 0600 in 0700 dirs.
+- `~/.config/get-reflect/config.env` holds the 1Password service-account token (written 0600 in a 0700 dir). Never log token values; `op` output may contain secrets too — backup files must only be written under the backup root, mode 0600 in 0700 dirs.
 - Formatting is Oxfmt's job (double quotes, semicolons, 100-col, sorted imports) — run `pnpm run format`, don't fix style by hand.
-- `src/config.ts` is the only place that reads `process.env` for configuration (`HOME` for path building and `src/status.ts`'s optional `process.loadEnvFile` are the exceptions).
+- `src/config.ts` is the only place that reads `process.env` for configuration and the only place that loads the config file (`HOME` for path building is the exception).
 
 ### TypeScript
 

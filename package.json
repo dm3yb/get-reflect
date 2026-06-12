@@ -2,17 +2,27 @@
 	"name": "get-reflect",
 	"version": "1.0.0",
 	"description": "GetReflect — automatic, scheduled backups of your 1Password vaults to JSON and CSV on your own Mac",
-	"private": true,
 	"type": "module",
 	"packageManager": "pnpm@10.33.0",
 	"engines": {
 		"node": ">=20.12"
 	},
+	"bin": {
+		"get-reflect": "dist/cli.js"
+	},
+	"files": [
+		"dist"
+	],
+	"os": [
+		"darwin"
+	],
 	"scripts": {
-		"setup": "tsx src/setup.ts",
-		"backup": "tsx --env-file=.env src/index.ts",
-		"status": "tsx src/status.ts",
-		"uninstall": "tsx src/uninstall.ts",
+		"build": "tsc -p tsconfig.build.json",
+		"prepublishOnly": "pnpm run build",
+		"setup": "tsx src/cli.ts setup",
+		"backup": "tsx src/cli.ts backup",
+		"status": "tsx src/cli.ts status",
+		"uninstall": "tsx src/cli.ts uninstall",
 		"test": "vitest run",
 		"typecheck": "tsc --noEmit",
 		"lint": "oxlint src tests",

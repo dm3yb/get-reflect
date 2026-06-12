@@ -31,7 +31,6 @@ The backup files contain your **actual passwords and TOTP secrets in plain text*
 
 - macOS
 - Node.js >= 20.12
-- pnpm
 - A [1Password Service Account](https://my.1password.com) with read access to the vaults you want backed up
 
 The 1Password CLI itself is optional to pre-install — the setup wizard offers to install it via Homebrew when it's missing.
@@ -45,13 +44,10 @@ The 1Password CLI itself is optional to pre-install — the setup wizard offers 
 3. Grant **read-only** access to each vault you want backed up
 4. Copy the token immediately — it's shown only once
 
-### 2. Clone, install, set up
+### 2. Run the wizard
 
 ```bash
-git clone git@github.com:dm3yb/get-reflect.git
-cd get-reflect
-pnpm install
-pnpm run setup
+npx get-reflect
 ```
 
 That's it. The guided wizard does the rest:
@@ -60,14 +56,16 @@ That's it. The guided wizard does the rest:
 - **verifies your token live** the moment you paste it (and shows which vaults it can see),
 - asks where to store backups (iCloud Drive default or a custom path),
 - asks how often to run — daily / weekly / monthly, each with an **"every N"** interval (e.g. *every 2 weeks*),
-- writes a complete `.env` (owner-only, `0600`),
+- writes the config file (owner-only, `0600`, in `~/.config/get-reflect/`),
 - generates and **installs the launchd scheduler**, and
 - offers to **run your first backup right away**.
+
+For repeated use, install it globally — `npm install -g get-reflect` — and the `get-reflect` command is always available.
 
 ### 3. Check on it anytime
 
 ```bash
-pnpm run status
+npx get-reflect status
 ```
 
 ```
@@ -87,27 +85,31 @@ pnpm run status
 
 ## Commands
 
-| Command              | What it does                                                       |
-| -------------------- | ------------------------------------------------------------------ |
-| `pnpm run setup`     | Guided onboarding: prerequisites, token, schedule, agent install.  |
-| `pnpm run backup`    | Back up all vaults right now (always runs, ignores the interval).  |
-| `pnpm run status`    | Show scheduler state, backup root, last backup, gating interval.   |
-| `pnpm run uninstall` | Remove the scheduled agent (keeps `.env` and all backup files).    |
+| Command                 | What it does                                                       |
+| ----------------------- | ------------------------------------------------------------------ |
+| `get-reflect` / `setup` | Guided onboarding: prerequisites, token, schedule, agent install.  |
+| `get-reflect backup`    | Back up all vaults right now (always runs, ignores the interval).  |
+| `get-reflect status`    | Show scheduler state, backup root, last backup, gating interval.   |
+| `get-reflect uninstall` | Remove the scheduled agent (keeps config and all backup files).    |
+
+(Prefix with `npx ` if you haven't installed globally.)
 
 ## Manual setup (without the wizard)
 
+Configuration lives in `~/.config/get-reflect/config.env` (env format). Create it owner-only:
+
 ```bash
-cp .env.example .env
-chmod 600 .env   # the wizard does this automatically; cp does not
+mkdir -p ~/.config/get-reflect && chmod 700 ~/.config/get-reflect
+touch ~/.config/get-reflect/config.env && chmod 600 ~/.config/get-reflect/config.env
 ```
 
-Edit `.env` and set at least the service account token (and optionally `BACKUP_PATH` / `BACKUP_INTERVAL_DAYS`):
+Set at least the service account token (and optionally `BACKUP_PATH` / `BACKUP_INTERVAL_DAYS`):
 
 ```
 OP_SERVICE_ACCOUNT_TOKEN=ops_...your_token...
 ```
 
-Then run `pnpm run setup` anyway when you want the scheduler — or manage launchd by hand:
+Then run `get-reflect setup` anyway when you want the scheduler — or manage launchd by hand:
 
 ```bash
 launchctl list | grep get-reflect            # verify it's active
@@ -119,9 +121,9 @@ tail -f ~/Library/Logs/get-reflect.log      # watch the log
 
 launchd's `StartCalendarInterval` is calendar-based and can't natively express "every other week". To support intervals, the scheduler fires on its base cadence (e.g. weekly on the chosen day/time) while the backup script skips runs until `BACKUP_INTERVAL_DAYS` have elapsed since the last backup:
 
-- The launchd agent invokes the script with `--scheduled`, which enables this gating.
+- The launchd agent invokes the CLI with `--scheduled`, which enables this gating.
 - The last backup date is read from the dated folders already in your backup directory — no extra state file.
-- Manual runs (`pnpm run backup`) omit `--scheduled` and **always** back up.
+- Manual runs (`get-reflect backup`) omit `--scheduled` and **always** back up.
 
 The wizard sets `BACKUP_INTERVAL_DAYS` for you (e.g. `14` for every 2 weeks, `56` for every 2 months). `0` or unset means "run on every cadence".
 
@@ -168,10 +170,14 @@ All CLI calls use `--cache` to reduce redundant server requests, and every subpr
 ## Development
 
 ```bash
+git clone git@github.com:dm3yb/get-reflect.git && cd get-reflect && pnpm install
+
+pnpm run setup         # run any command from sources via tsx (also: backup/status/uninstall)
 pnpm run test          # Vitest
 pnpm run typecheck     # tsc --noEmit
 pnpm run lint          # Oxlint
 pnpm run format        # Oxfmt (also sorts imports)
+pnpm run build         # compile to dist/ (what npm publishes)
 ```
 
 A Husky pre-push hook runs `format:check`, `lint`, and `test`. CI runs the same checks plus `typecheck` on every push and PR.
