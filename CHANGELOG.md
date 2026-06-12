@@ -4,6 +4,8 @@
 
 Initial public release.
 
+- Install and onboard with a single command: `npx get-reflect` (config lives in
+  `~/.config/get-reflect/`, owner-only).
 - Automatic, scheduled backups of 1Password vaults to JSON + CSV via the official `op` CLI.
 - Guided setup wizard: installs the 1Password CLI via Homebrew when missing, verifies the
   service-account token live, writes `.env` (owner-only), installs and loads the launchd
