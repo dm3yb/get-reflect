@@ -35,12 +35,31 @@ export function getIntervalDays(): number {
   return Number.isFinite(days) && days > 0 ? days : 0;
 }
 
+/** Directory holding GetReflect's user configuration. */
+export function configDir(): string {
+  return join(process.env.HOME ?? "", ".config", "get-reflect");
+}
+
+/** The env-format config file written by the setup wizard (mode 0600). */
+export function configFilePath(): string {
+  return join(configDir(), "config.env");
+}
+
+/** Load the config file into the environment, if it exists. */
+export function loadConfigFile(): void {
+  try {
+    process.loadEnvFile(configFilePath());
+  } catch {
+    /* not configured yet — commands that need the token fail with a clear message below */
+  }
+}
+
 /** Validate the required environment variables; throws when one is missing. */
 export function loadConfig(): void {
   if (!process.env.HOME) {
     throw new Error("HOME environment variable is not set.");
   }
   if (!process.env.OP_SERVICE_ACCOUNT_TOKEN) {
-    throw new Error("OP_SERVICE_ACCOUNT_TOKEN is not set. Add it to your .env file.");
+    throw new Error("OP_SERVICE_ACCOUNT_TOKEN is not set. Run: get-reflect setup");
   }
 }

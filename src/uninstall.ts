@@ -1,8 +1,6 @@
 /*
  * Uninstall command: unload the scheduled-backup agent and remove its plist.
- * `.env` and all backup files are left untouched.
- *
- * Run via: pnpm run uninstall
+ * The config file and all backup files are left untouched.
  */
 
 import { confirm } from "@clack/prompts";
@@ -14,7 +12,7 @@ import { execFileAsync } from "./utils/exec.js";
 import * as log from "./utils/logger.js";
 import { ask } from "./utils/prompt.js";
 
-async function main(): Promise<void> {
+export async function runUninstall(): Promise<void> {
   log.start("🔐 GetReflect — Uninstall");
 
   const plist = agentPlistPath();
@@ -25,7 +23,7 @@ async function main(): Promise<void> {
 
   const proceed = await ask(
     confirm({
-      message: "Remove the scheduled backup agent? (.env and existing backups are kept)",
+      message: "Remove the scheduled backup agent? (config and existing backups are kept)",
       initialValue: false,
     }),
   );
@@ -42,13 +40,6 @@ async function main(): Promise<void> {
   }
   await rm(plist);
 
-  log.step("Removed scheduled agent", `→ ${plist}`, ".env and backups were left untouched.");
+  log.step("Removed scheduled agent", `→ ${plist}`, "Config and backups were left untouched.");
   log.end(`${chalk.green("✔ Uninstalled")} — ${log.timestamp()}`);
 }
-
-main().catch((err: unknown) => {
-  const message = err instanceof Error ? err.message : String(err);
-  log.error(message);
-  log.end(chalk.red("✖ Uninstall failed"));
-  process.exit(1);
-});

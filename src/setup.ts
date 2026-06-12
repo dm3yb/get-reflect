@@ -1,10 +1,8 @@
 /*
  * Interactive setup wizard — the complete onboarding. Verifies the environment
  * (macOS, 1Password CLI — installing it via Homebrew if needed), collects and
- * live-verifies the settings, writes `.env`, installs the launchd agent, and
- * offers to run the first backup immediately.
- *
- * Run via: pnpm run setup
+ * live-verifies the settings, writes the config file, installs the launchd
+ * agent, and offers to run the first backup immediately.
  */
 
 import { confirm } from "@clack/prompts";
@@ -13,6 +11,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { pathExists } from "path-exists";
 import { main as runBackup } from "./backup.js";
+import { configDir, configFilePath } from "./config.js";
 import { LAUNCHD_LABEL, logFilePath } from "./constants.js";
 import { writeEnvFile } from "./setup/env-file.js";
 import { buildPlist, installAgent, scheduleToCalendarInterval } from "./setup/launchd.js";
@@ -22,7 +21,26 @@ import { describeSchedule, intervalToDays } from "./setup/schedule.js";
 import * as log from "./utils/logger.js";
 import { ask } from "./utils/prompt.js";
 
-export async function main(): Promise<void> {
+/**
+ * The scheduled agent re-invokes whatever entry is running right now: the
+ * compiled `dist/cli.js` for installed copies, or the TypeScript sources via
+ * tsx during development.
+ */
+function agentProgramArguments(): { programArguments: string[]; workingDir: string } {
+  const entry = process.argv[1] ?? "";
+  if (entry.endsWith(".ts")) {
+    return {
+      programArguments: [process.execPath, "--import", "tsx/esm", entry, "backup", "--scheduled"],
+      workingDir: process.cwd(),
+    };
+  }
+  return {
+    programArguments: [process.execPath, entry, "backup", "--scheduled"],
+    workingDir: process.env.HOME ?? "/",
+  };
+}
+
+export async function runSetup(): Promise<void> {
   log.start("🔐 GetReflect — Setup");
 
   assertMacos();
@@ -31,35 +49,39 @@ export async function main(): Promise<void> {
   const { token, backupPath, schedule } = await collectSetupInput();
   const intervalDays = intervalToDays(schedule);
 
-  const repoRoot = process.cwd();
-  const envPath = join(repoRoot, ".env");
-  if (await pathExists(envPath)) {
+  const configPath = configFilePath();
+  if (await pathExists(configPath)) {
     const overwrite = await ask(
       confirm({
-        message: ".env already exists. Overwrite it?",
+        message: "GetReflect is already configured. Overwrite the existing configuration?",
         initialValue: false,
       }),
     );
     if (!overwrite) {
-      log.end(chalk.yellow("✖ Setup cancelled — existing .env left untouched."));
+      log.end(chalk.yellow("✖ Setup cancelled — existing configuration left untouched."));
       return;
     }
   }
 
   await log.run(
-    "Writing .env...",
-    () => writeEnvFile(envPath, { token, backupPath, intervalDays }),
-    () => ({ msg: "Wrote .env", details: [`→ ${envPath}`, "permissions: owner-only (0600)"] }),
+    "Writing configuration...",
+    async () => {
+      await mkdir(configDir(), { recursive: true, mode: 0o700 });
+      await writeEnvFile(configPath, { token, backupPath, intervalDays });
+    },
+    () => ({
+      msg: "Wrote configuration",
+      details: [`→ ${configPath}`, "permissions: owner-only (0600)"],
+    }),
   );
 
   const logPath = logFilePath();
-  const plistPath = join(repoRoot, "launchd", `${LAUNCHD_LABEL}.plist`);
+  const plistPath = join(configDir(), `${LAUNCHD_LABEL}.plist`);
+  const { programArguments, workingDir } = agentProgramArguments();
   const plist = buildPlist({
     label: LAUNCHD_LABEL,
-    nodePath: process.execPath,
-    workingDir: repoRoot,
-    scriptPath: join(repoRoot, "src", "index.ts"),
-    envFile: ".env",
+    programArguments,
+    workingDir,
     calendarInterval: scheduleToCalendarInterval(schedule),
     logPath,
     pathEnv: `${dirname(process.execPath)}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin`,
@@ -67,10 +89,7 @@ export async function main(): Promise<void> {
 
   await log.run(
     "Generating launchd schedule...",
-    async () => {
-      await mkdir(dirname(plistPath), { recursive: true });
-      await writeFile(plistPath, plist);
-    },
+    () => writeFile(plistPath, plist),
     () => ({ msg: "Generated launchd plist", details: [`→ ${plistPath}`] }),
   );
 
@@ -89,8 +108,8 @@ export async function main(): Promise<void> {
     `Schedule: ${describeSchedule(schedule)}`,
     `Installed agent: ${installedPath}`,
     "",
-    "Check status:            pnpm run status",
-    "Run a backup anytime:    pnpm run backup",
+    "Check status:            get-reflect status",
+    "Run a backup anytime:    get-reflect backup",
     `View logs:               tail -f ${logPath}`,
   );
 
@@ -102,17 +121,9 @@ export async function main(): Promise<void> {
 
   log.end(`${chalk.green("✔ Setup complete")} — starting your first backup`);
 
-  /* The backup reads config from the environment; mirror what .env now holds. */
+  /* The backup reads config from the environment; mirror what the config file now holds. */
   process.env.OP_SERVICE_ACCOUNT_TOKEN = token;
   process.env.BACKUP_PATH = backupPath;
   process.env.BACKUP_INTERVAL_DAYS = String(intervalDays);
   await runBackup();
 }
-
-main().catch((err: unknown) => {
-  /* Ctrl-C inside a prompt is handled by ask(); this catches real failures. */
-  const message = err instanceof Error ? err.message : String(err);
-  log.error(message);
-  log.end(chalk.red("✖ Setup failed"));
-  process.exit(1);
-});
