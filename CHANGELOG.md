@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/dm3yb/get-reflect/compare/v1.1.0...v1.2.0) (2026-06-14)
+
+
+### Features
+
+* enhance GitHub Actions workflow for automated release and publishing to npm and GitHub Packages ([f18858a](https://github.com/dm3yb/get-reflect/commit/f18858a324576eadaf84ff2832ea35008f10aceb))
+
 ## [1.1.0](https://github.com/dm3yb/get-reflect/compare/v1.0.0...v1.1.0) (2026-06-12)
 
 

@@ -5,7 +5,7 @@ import { join } from "node:path";
 export const APP_NAME = "GetReflect";
 
 /* Bumped together with package.json by release-please. */
-export const VERSION = "1.1.0"; /* x-release-please-version */
+export const VERSION = "1.2.0"; /* x-release-please-version */
 
 /** launchd job label for the scheduled-backup LaunchAgent. */
 export const LAUNCHD_LABEL = "com.user.get-reflect";
