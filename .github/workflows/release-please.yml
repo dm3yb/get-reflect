@@ -11,8 +11,55 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
     steps:
       - uses: googleapis/release-please-action@v4
+        id: release
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+  publish:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run build
+
+      # Single .npmrc routes the bare name to npmjs and the @dm3yb scope to
+      # GitHub Packages. Tokens are expanded by pnpm from the env at publish
+      # time, so the file on disk never contains the secret values.
+      - name: Configure registry auth (npmjs + GitHub Packages)
+        run: |
+          cat > .npmrc <<'EOF'
+          //registry.npmjs.org/:_authToken=${NPM_TOKEN}
+          @dm3yb:registry=https://npm.pkg.github.com
+          //npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
+          EOF
+
+      - name: Publish to npm (get-reflect)
+        run: pnpm publish --no-git-checks
+
+      # GitHub Packages requires the package name to carry the owner scope.
+      # The rename is local to this ephemeral runner only.
+      - name: Publish to GitHub Packages (@dm3yb/get-reflect)
+        run: |
+          npm pkg set name=@dm3yb/get-reflect
+          pnpm publish --no-git-checks
