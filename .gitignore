@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .env
+.npmrc
 launchd/
 *.log
 .DS_Store
